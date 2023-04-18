@@ -53,6 +53,13 @@ void displayNumber(int num[]) {
   delay(5);
 }
 
+void displayNull() {
+  for (int i = 0; i < 6; i++) {
+    digitalWrite(segPins[i], LOW);
+  }
+  digitalWrite(segPins[6], HIGH);
+}
+
 void displayLoop() {
   digitalWrite(segPins[6], LOW);
   for (int j = 0; j < 6; j++) {
@@ -80,6 +87,7 @@ void setup() {
     displayLoop();
     Serial.print(".");
   }
+  displayNull();
 
   timeClient.begin();
   do {
