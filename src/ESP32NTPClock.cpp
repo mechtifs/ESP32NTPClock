@@ -24,11 +24,9 @@ const char digits[] = {
   0b11110110  // 9
 };
 
+ulong lastUpdateTime;
 ulong lastDigitTime = 0;
-ulong lastUpdateTime = 0;
 
-uint h;
-uint m;
 uint num[4];
 uint digitState = 0;
 
@@ -37,7 +35,7 @@ NTPClient timeClient(ntpUDP);
 
 void displayDigit(uint8_t pin, int num) {
   for (int i = 0; i < 7; i++) {
-    digitalWrite(segPins[i], (digits[num] << i) & 0b10000000);
+    digitalWrite(segPins[i], digits[num] << i & 0b10000000);
   }
 }
 
@@ -64,10 +62,10 @@ void syncTime() {
   while (!timeClient.update()) {
     displayLoop();
   }
-  uint now = timeClient.getEpochTime() + 3600 * TIME_ZONE;
-  lastUpdateTime = millis();
-  h = now / 3600 % 24;
-  m = now / 60 % 60;
+  uint epochTime = timeClient.getEpochTime() + 3600 * TIME_ZONE;
+  lastUpdateTime = millis() - epochTime % 60 * 1000;
+  int h = epochTime / 3600 % 24;
+  int m = epochTime / 60 % 60;
   num[0] = h / 10;
   num[1] = h % 10;
   num[2] = m / 10;
@@ -91,27 +89,31 @@ void setup() {
 void loop() {
   ulong now = millis();
   if (now - lastUpdateTime >= 60000) {
-    lastUpdateTime = now;
-    m = (m + 1) % 60;
-    num[2] = m / 10;
-    num[3] = m % 10;
-    if (!m) {
-      h = (h + 1) % 24;
-      if (h == SYNC_HOUR) {
-        syncTime();
-        return;
+    lastUpdateTime += 60000;
+    if (++num[3] == 10) {
+      num[3] = 0;
+      if (++num[2] == 6) {
+        num[2] = 0;
+        if (++num[1] == (num[0] == 2 ? 4 : 10)) {
+          num[1] = 0;
+          if (++num[0] == 3) {
+            num[0] = 0;
+          }
+        }
+        if (num[0] * 10 + num[1] == SYNC_HOUR) {
+          syncTime();
+        }
       }
-      num[0] = h / 10;
-      num[1] = h % 10;
     }
   }
 
-  if (now - lastDigitTime > 4) {
-    digitState = (digitState + 1) % 4;
-    digitalWrite(digitPins[(digitState + 3) % 4], HIGH);
+  if (now - lastDigitTime) {
+    digitalWrite(digitPins[digitState], HIGH);
+    if (++digitState == 4) {
+      digitState = 0;
+    }
     digitalWrite(digitPins[digitState], LOW);
     displayDigit(digitPins[digitState], num[digitState]);
     lastDigitTime = now;
   }
 }
-
